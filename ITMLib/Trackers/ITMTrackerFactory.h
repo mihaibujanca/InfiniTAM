@@ -35,27 +35,27 @@ namespace ITMLib
 	 */
 	class ITMTrackerFactory
 	{
+	public:
+        /// Tracker types
+        typedef enum {
+            //! Identifies a tracker based on colour image
+            TRACKER_COLOR,
+            //! Identifies a tracker based on depth image
+            TRACKER_ICP,
+            //! Identifies a tracker based on depth and color image with various extensions
+            TRACKER_EXTENDED,
+            //! Identifies a tracker reading poses from text files
+            TRACKER_FILE,
+            //! Identifies a tracker based on depth image and IMU measurement
+            TRACKER_IMU,
+            //! Identifies a tracker based on depth and colour images and IMU measurement
+            TRACKER_EXTENDEDIMU,
+            //! Identifies a tracker that forces tracking to fail
+            TRACKER_FORCEFAIL,
+        } TrackerType;
 	private:
 		//#################### TYPEDEFS ####################
 		typedef ITMTracker* MakerFunc(const Vector2i&,const Vector2i&,ORUtils::DeviceType,const ORUtils::KeyValueConfig &,const ITMLowLevelEngine*,ITMIMUCalibrator*,const ITMSceneParams*);
-
-		/// Tracker types
-		typedef enum {
-			//! Identifies a tracker based on colour image
-			TRACKER_COLOR,
-			//! Identifies a tracker based on depth image
-			TRACKER_ICP,
-			//! Identifies a tracker based on depth and color image with various extensions
-			TRACKER_EXTENDED,
-			//! Identifies a tracker reading poses from text files
-			TRACKER_FILE,
-			//! Identifies a tracker based on depth image and IMU measurement
-			TRACKER_IMU,
-			//! Identifies a tracker based on depth and colour images and IMU measurement
-			TRACKER_EXTENDEDIMU,
-			//! Identifies a tracker that forces tracking to fail
-			TRACKER_FORCEFAIL,
-		} TrackerType;
 
 		struct Maker {
 			const char *id;

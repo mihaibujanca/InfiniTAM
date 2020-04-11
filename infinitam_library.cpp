@@ -11,22 +11,25 @@
 #include <SLAMBenchAPI.h>
 #include <Eigen/Core>
 
+
+#include "ITAMConstants.h"
 #include <io/SLAMFrame.h>
 #include <io/sensor/CameraSensor.h>
 #include <io/sensor/CameraSensorFinder.h>
 #include <io/sensor/DepthSensor.h>
 #include <io/sensor/IMUSensor.h>
-
-
-
 #include <ITMMainEngine.h>
+#include <ITMBasicEngine.h>
+#include <ITMBasicSurfelEngine.h>
+#include <ITMMultiEngine.h>
 #include <MemoryBlock.h>
-
-#include "ITAMConstants.h"
-
+#include <ITMLibSettings.h>
+#include <ITMLibDefines.h>
+#include <Objects/Meshing/ITMMesh.h>
 static ITMMainEngine* mainEngine ;
 
 static Vector2i inputSize;
+static Vector2i depthInputSize;
 
 
 static ITMUChar4Image* rgbwrapper ;
@@ -70,9 +73,7 @@ bool
     skipPoints,
     stopIntegratingAtMaxW;
 
-int
-    noICPRunTillLevel,
-    maxW;
+int maxW;
 
 float
     depthTrackerICPThreshold,
@@ -82,11 +83,9 @@ float
     viewFrustum_max,
     mu;
 
-ITMLibSettings::TrackerType
-    trackerType;
+ITMTrackerFactory::TrackerType trackerType;
 
-ITMLibSettings::DeviceType
-    deviceType;
+ORUtils::DeviceType deviceType;
 
 std::vector<TrackerIterationType>
     trackingRegime;
@@ -100,7 +99,7 @@ std::vector<TrackerIterationType>
 bool sb_new_slam_configuration(SLAMBenchLibraryHelper * slam_settings) {
 
 
-    slam_settings->addParameter(TypedParameter<ITMLibSettings::TrackerType>  ("tt", "trackerType", "COLOR, ICP, REN, IMU, or WICP",  &trackerType             , &default_trackerType            ));
+    slam_settings->addParameter(TypedParameter<ITMTrackerFactory::TrackerType>  ("tt", "trackerType", "COLOR, ICP, REN, IMU, or WICP",  &trackerType             , &default_trackerType            ));
     slam_settings->addParameter(TypedParameter<float>("dticp", "depthTrackerICPThreshold",     "depthTrackerICPThreshold",      &depthTrackerICPThreshold,         &default_depthTrackerICPThreshold        ));
     slam_settings->addParameter(TypedParameter<float>("dttt", "depthTrackerTerminationThreshold",     "depthTrackerTerminationThreshold",      &depthTrackerTerminationThreshold, &default_depthTrackerTerminationThreshold));
     slam_settings->addParameter(TypedParameter<float>("vs", "voxelSize",     "voxelSize",      &voxelSize,                        &default_voxelSize                       ));
@@ -108,7 +107,6 @@ bool sb_new_slam_configuration(SLAMBenchLibraryHelper * slam_settings) {
     slam_settings->addParameter(TypedParameter<float>("vfmax", "viewFrustum_max",     "viewFrustum_max",      &viewFrustum_max,                  &default_viewFrustum_max                 ));
     slam_settings->addParameter(TypedParameter<float>("mu", "mu",     "mu",      &mu,                               &default_mu                              ));
     slam_settings->addParameter(TypedParameter<typename std::vector<TrackerIterationType> >  ("tr", "trackingRegime", "trackingRegime",  &trackingRegime, &default_trackingRegime));
-    slam_settings->addParameter(TypedParameter<int>  ("noicplvl", "noICPRunTillLevel", "noICPRunTillLevel",  &noICPRunTillLevel, &default_noICPRunTillLevel));
     slam_settings->addParameter(TypedParameter<int>  ("maxw", "maxW", "maxW",  &maxW             , &default_maxW            ));
     slam_settings->addParameter(TypedParameter<bool>("usesw", "useSwapping",        "useSwapping",        &useSwapping                 , &default_useSwapping               ));
     slam_settings->addParameter(TypedParameter<bool>("usebf", "useBilateralFilter",        "useBilateralFilter",        &useBilateralFilter          , &default_useBilateralFilter        ));
@@ -203,21 +201,20 @@ bool sb_init_slam_system(SLAMBenchLibraryHelper * slam_settings)  {
 
     internalSettings->useBilateralFilter = useBilateralFilter;
     internalSettings->useApproximateRaycast = useApproximateRaycast;
-    internalSettings->modelSensorNoise = modelSensorNoise;
-    internalSettings->trackerType = trackerType;
-    internalSettings->noICPRunTillLevel = noICPRunTillLevel;
+//    internalSettings->modelSensorNoise = modelSensorNoise;
+//    internalSettings->trackerType = trackerType;
     internalSettings->skipPoints = skipPoints;
 
-    internalSettings->depthTrackerICPThreshold = depthTrackerICPThreshold;
-    internalSettings->depthTrackerTerminationThreshold = depthTrackerTerminationThreshold;
-    internalSettings->useSwapping = useSwapping;
+//    internalSettings->depthTrackerICPThreshold = depthTrackerICPThreshold;
+//    internalSettings->depthTrackerTerminationThreshold = depthTrackerTerminationThreshold;
+//    internalSettings->useSwapping = useSwapping;
 
-    internalSettings->noHierarchyLevels = trackingRegime.size();
-    delete internalSettings->trackingRegime;
-    internalSettings->trackingRegime = new TrackerIterationType[internalSettings->noHierarchyLevels];
-    for (int i = 0 ; i < internalSettings->noHierarchyLevels ; i++) {
-        internalSettings->trackingRegime[i] = trackingRegime[i];
-    }
+//    internalSettings->noHierarchyLevels = trackingRegime.size();
+//    delete internalSettings->trackingRegime;
+//    internalSettings->trackingRegime = new TrackerIterationType[internalSettings->noHierarchyLevels];
+//    for (int i = 0 ; i < noHierarchyLevels ; i++) {
+//        internalSettings->trackingRegime[i] = trackingRegime[i];
+//    }
 
 
     internalSettings->sceneParams.voxelSize = voxelSize;
@@ -232,6 +229,10 @@ bool sb_init_slam_system(SLAMBenchLibraryHelper * slam_settings)  {
 
     inputSize[0] = rgb_sensor->Width;
     inputSize[1] = rgb_sensor->Height;
+
+
+    depthInputSize[0] = depth_sensor->Width;
+    depthInputSize[1] = depth_sensor->Height;
 
 
 
@@ -296,8 +297,21 @@ bool sb_init_slam_system(SLAMBenchLibraryHelper * slam_settings)  {
     depthwrapper  = new ITMShortImage  ( inputSize,true, false) ;
     imuwrapper    = new ITMIMUMeasurement ();
 
-    mainEngine = new ITMMainEngine( internalSettings, &calibration, inputSize, inputSize);
-
+    switch (internalSettings->libMode)
+    {
+        case ITMLibSettings::LIBMODE_BASIC:
+            mainEngine = new ITMBasicEngine<ITMVoxel, ITMVoxelIndex>(internalSettings, calibration, inputSize, depthInputSize);
+            break;
+        case ITMLibSettings::LIBMODE_BASIC_SURFELS:
+            mainEngine = new ITMBasicSurfelEngine<ITMSurfelT>(internalSettings, calibration, inputSize, depthInputSize);
+            break;
+        case ITMLibSettings::LIBMODE_LOOPCLOSURE:
+            mainEngine = new ITMMultiEngine<ITMVoxel, ITMVoxelIndex>(internalSettings, calibration, inputSize, depthInputSize);
+            break;
+        default:
+            throw std::runtime_error("Unsupported library mode!");
+            break;
+    }
 
     rgb = new ITMUChar4Image(inputSize, true, false);
     depth = new ITMUChar4Image(inputSize, true, false);
@@ -384,7 +398,7 @@ bool sb_process_once (SLAMBenchLibraryHelper * slam_settings)  {
     }
 
 #ifndef COMPILE_WITHOUT_CUDA
-        ITMSafeCall(cudaThreadSynchronize());
+    ORcudaSafeCall(cudaThreadSynchronize());
 #endif
 
     	depth_ready = false;
@@ -433,17 +447,14 @@ bool sb_update_outputs(SLAMBenchLibraryHelper *lib, const slambench::TimeStamp *
 	}
 
 	if(pointcloud_output->IsActive()) {
-	    ITMMesh* mesh = mainEngine->UpdateMesh();
+	    ITMMesh* mesh = new ITMMesh(MemoryDeviceType::MEMORYDEVICE_CPU); //mainEngine->UpdateMesh();
 	    slambench::values::PointCloudValue *point_cloud = new slambench::values::PointCloudValue();
 
 
 
 	    /// snippet from Mesh header to retrieve cloud even if in GPU
 	    //*****************************************************************
-
-	    typedef ORUtils::MemoryBlock<ITMLib::Objects::ITMMesh::Triangle> TriangleMemoryBlock;
-
-	    TriangleMemoryBlock *cpu_triangles;
+        ORUtils::MemoryBlock<ITMMesh::Triangle> *cpu_triangles;
 	    bool shoulDelete = false;
 
 	    if (!mesh->triangles) {
@@ -455,8 +466,8 @@ bool sb_update_outputs(SLAMBenchLibraryHelper *lib, const slambench::TimeStamp *
 
 #ifndef COMPILE_WITHOUT_CUDA
 
-				cpu_triangles = new TriangleMemoryBlock(mesh->noMaxTriangles, MEMORYDEVICE_CPU);
-				cpu_triangles->SetFrom(mesh->triangles, TriangleMemoryBlock::CUDA_TO_CPU);
+				cpu_triangles = new ORUtils::MemoryBlock<ITMMesh::Triangle>(mesh->noMaxTriangles, MEMORYDEVICE_CPU);
+				cpu_triangles->SetFrom(mesh->triangles, ORUtils::MemoryBlock<ITMMesh::Triangle>::CUDA_TO_CPU);
 				shoulDelete = true;
 #endif
 

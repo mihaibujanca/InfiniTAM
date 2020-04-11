@@ -50,3 +50,54 @@ ADD_SUBDIRECTORY(InputSource)
 ADD_SUBDIRECTORY(ITMLib)
 ADD_SUBDIRECTORY(MiniSlamGraphLib)
 ADD_SUBDIRECTORY(ORUtils)
+
+#################################################################################################
+# SLAMbench Libraries                                                                           #
+#################################################################################################
+
+### CPP
+#########
+
+add_library(${appname}-cpp infinitam_library.cpp)
+target_link_libraries(${appname}-cpp  ITMLib MiniSlamGraphLib ORUtils FernRelocLib)
+target_include_directories(${appname}-cpp  PRIVATE "ITMLib")
+target_include_directories(${appname}-cpp  PRIVATE "ITMLib/Core")
+target_include_directories(${appname}-cpp  PRIVATE "ITMLib/Engines")
+target_include_directories(${appname}-cpp  PRIVATE "ITMLib/Utils")
+target_include_directories(${appname}-cpp  PRIVATE "ITMLib/Trackers")
+target_include_directories(${appname}-cpp  PRIVATE "ORUtils")
+
+generate_slam_library(${appname}-cpp "")
+
+### OMP
+#########
+
+add_library(${appname}-omp infinitam_library.cpp)
+target_link_libraries(${appname}-omp  ITMLib MiniSlamGraphLib ORUtils FernRelocLib)
+target_include_directories(${appname}-omp  PRIVATE "ITMLib")
+target_include_directories(${appname}-omp  PRIVATE "ITMLib/Core")
+target_include_directories(${appname}-omp  PRIVATE "ITMLib/Engines")
+target_include_directories(${appname}-omp  PRIVATE "ITMLib/Utils")
+target_include_directories(${appname}-omp  PRIVATE "ITMLib/Trackers")
+target_include_directories(${appname}-omp  PRIVATE "ORUtils")
+
+generate_slam_library(${appname}-omp "${OpenMP_CXX_FLAGS}")
+
+IF (CUDA_FOUND)
+
+  ### CUDA
+  #########
+
+  add_library(${appname}-cuda infinitam_library.cpp)
+  target_link_libraries(${appname}-cuda  MiniSlamGraphLib ORUtils FernRelocLib ITMLibCUDA UtilsCUDA)
+  target_include_directories(${appname}-cuda  PRIVATE "ITMLib")
+  target_include_directories(${appname}-cuda  PRIVATE "ITMLib/Core")
+  target_include_directories(${appname}-cuda  PRIVATE "ITMLib/Engines")
+  target_include_directories(${appname}-cuda  PRIVATE "ITMLib/Utils")
+  target_include_directories(${appname}-cuda  PRIVATE "ITMLib/Trackers")
+  target_include_directories(${appname}-cuda  PRIVATE "ORUtils")
+
+  generate_slam_library(${appname}-cuda "")
+
+ENDIF()
+
